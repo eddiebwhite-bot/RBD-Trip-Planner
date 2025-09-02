@@ -1,0 +1,296 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>River Bridge Delivery — Route Planner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64'%3E%3Crect width='64' height='64' fill='%232563eb'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='Arial' font-size='28' fill='white'%3ER%3C/text%3E%3C/svg%3E">
+  <style>
+    html, body { height:100%; }
+    .btn { border:1px solid #d1d5db; background:#fff; border-radius:0.75rem; padding:0.5rem 0.75rem; font-size:0.875rem; box-shadow:0 1px 1px rgba(0,0,0,.04); }
+    .btn:hover { background:#f9fafb; }
+    .btn-primary { background:#2563eb; color:#fff; border-color:#2563eb; }
+    .btn-primary:hover { background:#1e40af; }
+    .btn-green { background:#16a34a; color:#fff; border-color:#16a34a; }
+    .btn-green:hover { background:#166534; }
+    .toast { position:fixed; inset-inline:0; bottom:16px; display:flex; justify-content:center; pointer-events:none; z-index:1000; }
+    .toast > div { pointer-events:auto; background:#111827; color:#fff; padding:8px 12px; border-radius:999px; }
+    .toast.success > div { background:#16a34a; }
+    .toast.error > div { background:#dc2626; }
+    .hidden-important { display:none !important; }
+    code { background:#f3f4f6; padding:0 4px; border-radius:6px; }
+  </style>
+</head>
+<body class="min-h-screen bg-gray-50 text-gray-900">
+  <header class="sticky top-0 z-10 bg-white/80 backdrop-blur border-b">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-blue-600 flex items-center justify-center text-white font-bold">RBD</div>
+      <div class="flex-1">
+        <h1 class="text-xl font-semibold leading-tight">River Bridge Delivery — Route Planner</h1>
+        <p class="text-xs text-gray-500">Quote runs, send to Google Maps, and optimize multi-stop routes.</p>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto p-4 grid md:grid-cols-2 gap-4">
+    <!-- LEFT -->
+    <section class="space-y-3">
+      <div class="rounded-2xl bg-white shadow p-4 space-y-3">
+        <h2 class="font-semibold text-lg">1) Connect Google Maps</h2>
+        <label class="block text-sm font-medium">Google Maps API Key</label>
+        <input id="apiKey" type="password" class="w-full border rounded-xl px-3 py-2" placeholder="AIza..." />
+        <div class="flex gap-2 items-center flex-wrap">
+          <button id="loadMapsBtn" class="btn btn-primary">Load Google Maps</button>
+          <span class="text-xs text-gray-500">This build has your key embedded. You can replace it here if needed.</span>
+        </div>
+      </div>
+
+      <!-- Quote -->
+      <div class="rounded-2xl bg-white shadow p-4 space-y-3">
+        <h2 class="font-semibold text-lg">2) Instant Quote</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium">Pickup</label>
+            <input id="qPickup" type="text" class="w-full border rounded-xl px-3 py-2" placeholder="Pickup address"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">Dropoff</label>
+            <input id="qDrop" type="text" class="w-full border rounded-xl px-3 py-2" placeholder="Dropoff address"/>
+          </div>
+        </div>
+
+        <div class="grid md:grid-cols-2 gap-3">
+          <label class="flex items-center gap-2 text-sm"><input id="useTrailer" type="checkbox" class="scale-110"/> Use Trailer</label>
+          <label class="flex items-center gap-2 text-sm"><input id="addPharmacy" type="checkbox" class="scale-110"/> Pharmacy</label>
+          <label class="flex items-center gap-2 text-sm"><input id="addRush" type="checkbox" class="scale-110"/> Rush (+$5)</label>
+          <label class="flex items-center gap-2 text-sm">Tax <input id="taxRate" type="number" min="0" step="0.01" class="w-24 border rounded-lg px-2 py-1" value="0"/> %</label>
+        </div>
+
+        <div class="flex gap-2 flex-wrap">
+          <button id="quoteBtn" class="btn btn-green">Get Quote</button>
+          <button id="quoteUseBtn" class="btn">Use in Planner</button>
+          <a id="quoteGmapsLink" target="_blank" rel="noreferrer" class="btn hidden">Open in Google Maps</a>
+          <button id="quoteResetBtn" class="btn">Reset</button>
+        </div>
+        <div id="quoteOut" class="text-sm text-gray-800"></div>
+      </div>
+
+      <!-- Planner -->
+      <div class="rounded-2xl bg-white shadow p-4 space-y-3">
+        <h2 class="font-semibold text-lg">3) Planner Addresses</h2>
+        <div class="grid md:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-sm font-medium">Start (Depot)</label>
+            <input id="startAddr" type="text" class="w-full border rounded-xl px-3 py-2" placeholder="917 Martin Luther King Ave, Vidalia, LA 71373"/>
+          </div>
+          <div>
+            <label class="block text-sm font-medium">End (Final Stop)</label>
+            <input id="endAddr" type="text" class="w-full border rounded-xl px-3 py-2" placeholder="(blank for round trip)"/>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-1">
+          <input id="roundTrip" type="checkbox" class="scale-110" checked/>
+          <label for="roundTrip" class="text-sm">Return to Start (Round Trip)</label>
+        </div>
+        <label class="block text-sm font-medium pt-2">Delivery Stops (one per line)</label>
+        <textarea id="stops" class="w-full border rounded-xl px-3 py-2 h-44" placeholder="Example:
+CVS Pharmacy, 483 John R Junkin Dr, Natchez, MS
+Lowe's, 609 S Promenade, Vidalia, LA"></textarea>
+
+        <div class="flex gap-2 mt-1 flex-wrap">
+          <button id="optimizeBtn" class="btn btn-primary">Optimize Route</button>
+          <a id="openGmapsLink" target="_blank" rel="noreferrer" class="btn hidden">Open in Google Maps</a>
+        </div>
+        <div id="errorBox" class="text-red-600 text-sm"></div>
+      </div>
+    </section>
+
+    <!-- RIGHT -->
+    <section class="space-y-3">
+      <div class="rounded-2xl bg-white shadow p-4">
+        <div class="flex items-center justify-between mb-2">
+          <h2 class="font-semibold text-lg">Manifest</h2>
+        </div>
+        <div id="manifestTable" class="overflow-auto text-sm text-gray-800">
+          <div class="text-sm text-gray-500">When you optimize, ordered stops, distances, and ETAs will appear here.</div>
+        </div>
+      </div>
+
+      <div class="rounded-2xl bg-white shadow p-1">
+        <div id="map" class="h-[420px] rounded-2xl overflow-hidden"></div>
+      </div>
+
+      <div class="rounded-2xl bg-white shadow p-4 text-xs text-gray-500 space-y-1">
+        <div><b>Privacy:</b> Keys & addresses stay on your device. Restrict your API key to your domain in Google Cloud Console (HTTP referrers).</div>
+        <div><b>Limits:</b> Google Directions allows up to 25 total points per route.</div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"><div></div></div>
+
+  <script type="text/javascript">
+  (function(){
+    "use strict";
+    var EMBEDDED_KEY = "AIzaSyDIG0Yixx6helFXAm4zal2tSIDuDNyjAZU";
+    var el = function(id){ return document.getElementById(id); };
+    var state = { googleLoaded:false, map:null, dirRenderer:null, result:null, lastQuote:null };
+
+    function showToast(msg, type, ms){
+      var t = el('toast');
+      t.classList.remove('hidden','success','error');
+      if(type==='success') t.classList.add('success');
+      if(type==='error') t.classList.add('error');
+      t.querySelector('div').textContent = msg;
+      clearTimeout(t._id);
+      t._id = setTimeout(function(){ t.classList.add('hidden'); }, ms||2200);
+    }
+
+    function formatDuration(seconds){
+      if (!(seconds > 0)) return '–';
+      var hrs = Math.floor(seconds / 3600);
+      var mins = Math.round((seconds % 3600) / 60);
+      if (hrs <= 0) return mins + ' min';
+      return hrs + ' hr ' + (mins < 10 ? ('0' + mins) : String(mins)) + ' min';
+    }
+    function formatDistance(meters){
+      if (!(meters > 0)) return '–';
+      var mi = meters/1609.344;
+      return (mi < 10 ? mi.toFixed(2) : mi.toFixed(1)) + ' mi';
+    }
+
+    function baseMileagePrice(mi){ var base=20; var over5=Math.max(0, mi-5); return base + 2*over5; }
+    function trailerPrice(mi){ var base=30; var first5=Math.min(5,mi); var over5=Math.max(0, mi-5); return base + 2*first5 + 3*over5; }
+    function pharmacyPrice(mi){ var base=10; var over5=Math.max(0, mi-5); return base + 2*over5; }
+
+    function buildDirLink(orderAddrs){
+      if (orderAddrs.length<2) return '';
+      var origin=encodeURIComponent(orderAddrs[0]);
+      var dest=encodeURIComponent(orderAddrs[orderAddrs.length-1]);
+      var waypoints=orderAddrs.slice(1,-1).map(encodeURIComponent).join('|');
+      var sp=new URLSearchParams({api:'1',origin:origin,destination:dest,travelmode:'driving'});
+      if(waypoints) sp.set('waypoints', waypoints);
+      return 'https://www.google.com/maps/dir/?'+sp.toString();
+    }
+
+    function loadGoogleMapsJs(apiKey){
+      return new Promise(function(resolve,reject){
+        if (window.google && window.google.maps) { resolve(window.google); return; }
+        if(!apiKey){ reject(new Error('Google Maps API key is required')); return; }
+        var id='gmaps-js';
+        if(document.getElementById(id)){
+          document.getElementById(id).addEventListener('load', function(){ resolve(window.google); });
+          document.getElementById(id).addEventListener('error', function(){ reject(new Error('Failed to load Google Maps JS')); });
+          return;
+        }
+        var s=document.createElement('script');
+        s.id=id; s.async=true; s.defer=true;
+        s.src='https://maps.googleapis.com/maps/api/js?key='+encodeURIComponent(apiKey)+'&libraries=places';
+        s.onload=function(){ resolve(window.google); };
+        s.onerror=function(){ reject(new Error('Failed to load Google Maps JS')); };
+        document.head.appendChild(s);
+      });
+    }
+
+    function ensureMapsLoaded(){
+      var apiKey = (el('apiKey').value || EMBEDDED_KEY).trim();
+      el('apiKey').value = apiKey;
+      return loadGoogleMapsJs(apiKey).then(function(){
+        if(!state.map){
+          state.map=new google.maps.Map(el('map'), { center:{lat:31.5668,lng:-91.4254}, zoom:10, mapTypeControl:false, streetViewControl:false, fullscreenControl:false });
+        }
+        state.googleLoaded=true;
+        showToast('Google Maps connected','success');
+      });
+    }
+
+    function computeDistanceRow(origin, destinations){
+      return new Promise(function(resolve,reject){
+        var svc=new google.maps.DistanceMatrixService();
+        svc.getDistanceMatrix({ origins:[origin], destinations:destinations, travelMode:google.maps.TravelMode.DRIVING, unitSystem:google.maps.UnitSystem.IMPERIAL }, function(res,status){
+          if(status!=='OK'){ reject(new Error('DistanceMatrix error: '+status)); return; }
+          try{
+            var row=res.rows[0].elements.map(function(e){ return { duration: (e.duration && e.duration.value) || Infinity, distance: (e.distance && e.distance.value) || Infinity, status: e.status }; });
+            resolve(row);
+          }catch(err){ reject(err); }
+        });
+      });
+    }
+
+    function onQuote(){
+      el('quoteOut').innerHTML = '<div class="text-gray-500">Calculating…</div>';
+      var pickup = el('qPickup').value.trim();
+      var drop = el('qDrop').value.trim();
+      if(!pickup || !drop){ showToast('Enter pickup and dropoff','error'); el('quoteOut').innerHTML=''; return; }
+      (state.googleLoaded ? Promise.resolve() : ensureMapsLoaded())
+      .then(function(){ return computeDistanceRow(pickup,[drop]); })
+      .then(function(row){
+        var el0 = row[0];
+        if(el0.status !== 'OK') throw new Error('Address lookup failed ('+el0.status+'). Check spelling.');
+        var meters = el0.distance, seconds = el0.duration, miles = meters/1609.344;
+        var useTrailer = el('useTrailer').checked;
+        var addPharmacy = el('addPharmacy').checked;
+        var addRush = el('addRush').checked;
+        var taxRate = Number(el('taxRate').value||0);
+
+        var mileage = addPharmacy ? pharmacyPrice(miles) : (useTrailer ? trailerPrice(miles) : baseMileagePrice(miles));
+        var rush = addRush ? 5 : 0;
+        var subtotal = mileage + rush;
+        var tax = (taxRate/100)*subtotal;
+        var total = subtotal + tax;
+
+        state.lastQuote = { pickup:pickup, drop:drop, meters:meters, seconds:seconds, miles:miles, options: {useTrailer:useTrailer, addPharmacy:addPharmacy, addRush:addRush, taxRate:taxRate}, total:total };
+
+        var html = '';
+        html += '<div class="rounded-xl border p-3 bg-gray-50">';
+        html += '<div><b>Distance:</b> '+formatDistance(meters)+' • <b>Time:</b> '+formatDuration(seconds)+'</div>';
+        html += '<div class="mt-2">';
+        if(addPharmacy) html += '<div>Pharmacy mileage: <b>$'+mileage.toFixed(2)+'</b> (base $10; +$2/mi after 5)</div>';
+        else if(useTrailer) html += '<div>Trailer mileage: <b>$'+mileage.toFixed(2)+'</b></div>';
+        else html += '<div>Base mileage: <b>$'+mileage.toFixed(2)+'</b></div>';
+        if(addRush) html += '<div>Rush add-on: <b>$5.00</b></div>';
+        html += '<div>Tax ('+taxRate+'%): <b>$'+tax.toFixed(2)+'</b></div>';
+        html += '<div class="mt-1 text-lg">Estimated Total: <b>$'+total.toFixed(2)+'</b></div>';
+        html += '</div>';
+        html += '<div class="text-xs text-gray-500 mt-2">This is an estimate. Final may change with actual route/stops/traffic.</div>';
+        html += '</div>';
+        el('quoteOut').innerHTML = html;
+
+        var qlink = el('quoteGmapsLink');
+        var url = buildDirLink([pickup, drop]);
+        if(url){ qlink.classList.remove('hidden'); qlink.href = url; }
+        else { qlink.classList.add('hidden'); }
+
+        showToast('Quote ready','success');
+      })
+      .catch(function(e){
+        el('quoteOut').innerHTML = '<div class="text-red-600">Quote failed: '+(e.message||e)+'</div>';
+        console.error(e);
+      });
+    }
+
+    function onQuoteUse(){
+      var pickup = el('qPickup').value.trim();
+      var drop = el('qDrop').value.trim();
+      if(!pickup || !drop){ showToast('Enter pickup and dropoff','error'); return; }
+      el('startAddr').value = pickup;
+      el('endAddr').value = drop;
+      el('roundTrip').checked = false;
+      showToast('Loaded into planner','success');
+    }
+
+    // Events
+    el('loadMapsBtn').addEventListener('click', function(){ ensureMapsLoaded(); });
+    el('quoteBtn').addEventListener('click', onQuote);
+    el('quoteUseBtn').addEventListener('click', onQuoteUse);
+    el('quoteResetBtn').addEventListener('click', function(){ el('qPickup').value=''; el('qDrop').value=''; el('quoteOut').innerHTML=''; el('quoteGmapsLink').classList.add('hidden'); });
+
+    // Init
+    (function initOnLoad(){
+      el('apiKey').value = EMBEDDED_KEY;
+    })();
+  })();
+  </script>
+</body>
+</html>
